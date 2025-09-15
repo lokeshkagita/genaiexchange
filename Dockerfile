@@ -8,16 +8,14 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# Copy application source (only what's needed for the backend)
-COPY server.js ./
+# Copy all application files
+COPY . .
 
 # Environment
 ENV NODE_ENV=production
 
-# Cloud Run listens on $PORT; our app already uses process.env.PORT with default 3000
-EXPOSE 3000
+# Cloud Run listens on $PORT (default 8080)
+EXPOSE 8080
 
 # Start the server
 CMD ["npm", "start"]
-
-
