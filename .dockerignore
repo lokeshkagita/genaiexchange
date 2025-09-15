@@ -1,0 +1,32 @@
+# Node dependencies and logs
+node_modules
+npm-debug.log
+
+# Git metadata
+.git
+.gitignore
+
+# OS/editor junk
+.DS_Store
+Thumbs.db
+*.iml
+.idea
+.vscode
+
+# Flutter and platform client code not needed for backend image
+android
+ios
+linux
+macos
+web
+windows
+assets
+build
+lib
+pubspec.lock
+pubspec.yaml
+
+docker-compose.yml
+**/.dart_tool
+**/.gradle
+**/build
