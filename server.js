@@ -69,9 +69,9 @@ app.get('/health', (req, res) => {
 
 // User registration endpoint
 app.post('/register', (req, res) => {
-  const { fullName, email, age, gender, password } = req.body;
+  const { fullName, email, age, gender, password, mood } = req.body;
   
-  console.log('New user registration:', { fullName, email, age, gender });
+  console.log('New user registration:', { fullName, email, age, gender, mood });
   
   // Check if user already exists
   const existingUser = users.find(user => user.email === email);
@@ -90,6 +90,7 @@ app.post('/register', (req, res) => {
     email,
     age,
     gender,
+    mood: mood || 'Happy', // Default to Happy if no mood provided
     password, // In production, hash this password!
     createdAt: new Date().toISOString(),
     lastActive: new Date().toISOString()
@@ -107,7 +108,8 @@ app.post('/register', (req, res) => {
       fullName: newUser.fullName,
       email: newUser.email,
       age: newUser.age,
-      gender: newUser.gender
+      gender: newUser.gender,
+      mood: newUser.mood
     }
   });
 });
@@ -154,7 +156,8 @@ app.post('/login', (req, res) => {
       fullName: user.fullName,
       email: user.email,
       age: user.age,
-      gender: user.gender
+      gender: user.gender,
+      mood: user.mood
     }
   });
 });
@@ -172,6 +175,83 @@ app.get('/users', (req, res) => {
     lastActive: user.lastActive
   }));
   res.json({ users: userList, count: users.length });
+});
+
+// Matching endpoints for production compatibility
+app.get('/api/matches/potential/:mood/:userId', (req, res) => {
+  const { mood, userId } = req.params;
+  
+  console.log(`Finding matches for mood: ${mood}, user: ${userId}`);
+  
+  // Filter users by mood, exclude current user, and limit results
+  const potentialMatches = users
+    .filter(user => 
+      user.mood === mood && 
+      user.userId.toString() !== userId.toString() &&
+      user.lastActive // Only active users
+    )
+    .map(user => ({
+      id: user.userId,
+      full_name: user.fullName,
+      email: user.email,
+      age: user.age,
+      gender: user.gender,
+      mood: user.mood,
+      last_seen: user.lastActive,
+      is_online: true
+    }))
+    .slice(0, 20); // Limit to 20 matches
+  
+  console.log(`Found ${potentialMatches.length} potential matches`);
+  
+  res.json({
+    success: true,
+    matches: potentialMatches,
+    count: potentialMatches.length
+  });
+});
+
+// Create match endpoint
+app.post('/api/matches/create', (req, res) => {
+  const { user1Id, user2Id } = req.body;
+  
+  console.log(`Creating match between ${user1Id} and ${user2Id}`);
+  
+  // Generate unique match ID
+  const matchId = `match_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  // In a real app, you'd store this in a database
+  // For now, we'll just return success
+  res.json({
+    success: true,
+    matchId: matchId,
+    message: 'Match created successfully'
+  });
+});
+
+// Update online status endpoint
+app.post('/api/users/online-status', (req, res) => {
+  const { userId, isOnline } = req.body;
+  
+  console.log(`Updating online status for ${userId}: ${isOnline}`);
+  
+  const user = users.find(u => u.userId.toString() === userId.toString());
+  if (user) {
+    user.lastActive = new Date().toISOString();
+    res.json({ success: true, message: 'Status updated' });
+  } else {
+    res.status(404).json({ success: false, message: 'User not found' });
+  }
+});
+
+// Test connection endpoint
+app.get('/api/test-connection', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Backend connection successful',
+    timestamp: new Date().toISOString(),
+    activeUsers: users.length
+  });
 });
 
 // AI Girlfriend Service Endpoints
