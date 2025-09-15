@@ -4,10 +4,16 @@ const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { createClient } = require('@supabase/supabase-js');
 
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'AIzaSyBrtqlw5sysR_-htsDl03RLZuGEXPnIAnk');
 const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+
+// Initialize Supabase client for syncing users
+const supabaseUrl = 'https://pvkwfzhcctnkuwqnzpka.supabase.co';
+const supabaseKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB2a3dmemhjY3Rua3V3cW56cGthIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ3MTc3NjAsImV4cCI6MjA1MDI5Mzc2MH0.wXDgmkKpOLnJJJxFfNHdnVEqQKKLRTEhHYSdE0Oj8Zs';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Helper function to clean AI responses
 function cleanAIResponse(text) {
@@ -68,7 +74,7 @@ app.get('/health', (req, res) => {
 });
 
 // User registration endpoint
-app.post('/register', (req, res) => {
+app.post('/register', async (req, res) => {
   const { fullName, email, age, gender, password, mood } = req.body;
   
   console.log('New user registration:', { fullName, email, age, gender, mood });
@@ -97,6 +103,24 @@ app.post('/register', (req, res) => {
   };
   
   users.push(newUser);
+
+  // Sync user to Supabase for matching compatibility
+  try {
+    await supabase.from('profiles').upsert({
+      id: newUser.userId.toString(),
+      full_name: newUser.fullName,
+      email: newUser.email,
+      age: newUser.age,
+      gender: newUser.gender,
+      mood: newUser.mood,
+      is_online: true,
+      last_seen: newUser.lastActive,
+      created_at: newUser.createdAt
+    });
+    console.log('User synced to Supabase for matching compatibility');
+  } catch (supabaseError) {
+    console.log('Supabase sync failed (non-critical):', supabaseError.message);
+  }
   
   res.json({ 
     success: true, 
@@ -115,7 +139,7 @@ app.post('/register', (req, res) => {
 });
 
 // User login endpoint
-app.post('/login', (req, res) => {
+app.post('/login', async (req, res) => {
   const { email, password } = req.body;
   
   console.log('Login attempt:', { email });
@@ -145,6 +169,24 @@ app.post('/login', (req, res) => {
   
   // Update last active
   user.lastActive = new Date().toISOString();
+
+  // Sync user status to Supabase for matching compatibility
+  try {
+    await supabase.from('profiles').upsert({
+      id: user.userId.toString(),
+      full_name: user.fullName,
+      email: user.email,
+      age: user.age,
+      gender: user.gender,
+      mood: user.mood,
+      is_online: true,
+      last_seen: user.lastActive,
+      created_at: user.createdAt
+    });
+    console.log('User login synced to Supabase');
+  } catch (supabaseError) {
+    console.log('Supabase login sync failed (non-critical):', supabaseError.message);
+  }
   
   res.json({
     success: true,
@@ -230,7 +272,7 @@ app.post('/api/matches/create', (req, res) => {
 });
 
 // Update online status endpoint
-app.post('/api/users/online-status', (req, res) => {
+app.post('/api/users/online-status', async (req, res) => {
   const { userId, isOnline } = req.body;
   
   console.log(`Updating online status for ${userId}: ${isOnline}`);
@@ -238,6 +280,25 @@ app.post('/api/users/online-status', (req, res) => {
   const user = users.find(u => u.userId.toString() === userId.toString());
   if (user) {
     user.lastActive = new Date().toISOString();
+    
+    // Sync status to Supabase for matching compatibility
+    try {
+      await supabase.from('profiles').upsert({
+        id: user.userId.toString(),
+        full_name: user.fullName,
+        email: user.email,
+        age: user.age,
+        gender: user.gender,
+        mood: user.mood,
+        is_online: isOnline,
+        last_seen: user.lastActive,
+        created_at: user.createdAt
+      });
+      console.log('Online status synced to Supabase');
+    } catch (supabaseError) {
+      console.log('Supabase status sync failed (non-critical):', supabaseError.message);
+    }
+    
     res.json({ success: true, message: 'Status updated' });
   } else {
     res.status(404).json({ success: false, message: 'User not found' });
